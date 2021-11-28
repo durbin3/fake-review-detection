@@ -17,9 +17,9 @@ except:
 
 def main(argv):
     train_raw = loadData('train')
-    xTrain,yTrain = preprocessData(train_raw)
-    val_raw = loadData('validation')
-    xTest,yTest = preprocessData(val_raw)
+    xTrain,xTest,yTrain,yTest  = preprocessData(train_raw)
+    # val_raw = loadData('validation')
+    # xTest,yTest = preprocessData(val_raw)
     model = buildModel(xTrain,yTrain,xTest,yTest)
     
 def loadData(file):
@@ -34,8 +34,10 @@ def loadData(file):
  
 def preprocessData(raw):
     print("Preprocessing Data")
+    load = False
     try:
         vectorizer = pickle.load(open('vectorizer.pk', 'rb'))
+        load = True
     except:
         vectorizer = TfidfVectorizer(max_features=5000)
 
@@ -47,10 +49,12 @@ def preprocessData(raw):
     X = np.insert(X,0,raw['rating'],1)
     X = np.insert(X,0,x_cat.to_numpy(),1)
     with open('vectorizer.pk', 'wb') as fout:
-        pickle.dump(vectorizer, fout)
+        if load is False:
+            pickle.dump(vectorizer, fout)
 
     print(X.shape,len(raw['real review?']))
-    return X,raw['real review?']
+    x_train,x_test,y_train,y_test = split_train_test(X,raw['real review?'])
+    return x_train,x_test,y_train,y_test
 
 def buildModel(x,y,valX,valY):
     print("Building Model")
@@ -65,7 +69,7 @@ def buildModel(x,y,valX,valY):
         print("Training Scores: ", t_acc,t_mcc)
         print("Validation Scores: ", accuracy,mcc)
 
-        print(f'Fraction of non-zero model parameters {np.sum(model.coef_!=0)+1/(len(model.coef_)+1)}')
+        print(f'Number of non-zero model parameters {np.sum(model.coef_!=0)}')
 
         if mcc > best_accuracy:
             save_model(model, joblib_file)

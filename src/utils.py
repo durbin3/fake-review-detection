@@ -49,3 +49,16 @@ def calc_if_outlier(df,column):
 def calc_mcc(pred,actual):
     mcc = matthews_corrcoef(pred,actual)
     return mcc
+
+def split_train_test(x,y):
+    df = pd.DataFrame(x)
+    df = df.join(y)
+    train = df.sample(frac=.8,replace=False)
+    test = df.drop(train)
+
+    x_train = train[:,:-1]
+    y_train = train[:,-1:]
+    x_test = test[:,:-1]
+    y_test = test[:,-1:]
+
+    return x_train,x_test,y_train,y_test
