@@ -54,7 +54,7 @@ def split_train_test(x,y):
     df = pd.DataFrame(x)
     df = df.join(y)
     train = df.sample(frac=.8,replace=False)
-    test = df.drop(train)
+    test = df.drop(train.index)
 
     x_train = train[:,:-1]
     y_train = train[:,-1:]
