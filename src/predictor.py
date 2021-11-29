@@ -18,13 +18,20 @@ except:
 def main(argv):
     if argv[0]=='--train':
         train_raw = loadData('train')
+        generate_vectorizer(train_raw)
         models = {}
         for rating in [5,4,3,2,1]:
             print("\nRating=", rating)
-            raw_rating = train_raw.loc[train_raw['rating']==rating]
-            raw_rating = raw_rating.reset_index()
-            xTrain,xTest,yTrain,yTest  = preprocessData(raw_rating)
-            models[rating] = buildModel(xTrain,yTrain,xTest,yTest,"model_"+str(rating)+".pkl")
+            try:
+                model = load_model("model_"+str(rating)+".pkl")
+                models[rating]=model
+            except:
+                raw_rating = train_raw.loc[train_raw['rating']==rating]
+                raw_rating = raw_rating.reset_index()
+                xTrain,xTest,yTrain,yTest  = preprocessData(raw_rating)
+                buildModel(xTrain,yTrain,xTest,yTest,"model_"+str(rating)+".pkl")
+                model = load_model("model_"+str(rating)+".pkl")
+                models[rating] = model
         finalPredictions(models)
         # model = buildModel(xTrain,yTrain,xTest,yTest)
     elif argv[0]=='--test':
@@ -46,20 +53,21 @@ def preprocessData(raw,split=True):
     print("Preprocessing Data")
     load = False
     try:
-        vectorizer = pickle.load(open('vectorizer.pk', 'rb'))
+        vectorizer = pickle.load(open('./model/vectorizer.pk', 'rb'))
         load = True
+        print("\tLoaded Vectorizer")
     except:
+        print("\tERROR: Could not find Vectorizer, generating new vectorizer")
         vectorizer = TfidfVectorizer(max_features=5000)
 
     corpora = raw['text_'].astype(str).values.tolist()
-    vectorizer.fit(corpora)
+    if (load is False):
+        print("\tFitting Vectorizer")
+        vectorizer.fit(corpora)
     X = vectorizer.transform(corpora)
     X = X.toarray()
-    # X = np.insert(X,0,raw['rating'],1)
-    # x_cat = pd.DataFrame(raw['category'])['category'].astype('category').cat.codes
-    # X = np.insert(X,0,x_cat.to_numpy(),1)
-    with open('vectorizer.pk', 'wb') as fout:
-        if load is False:
+    if load is False:
+        with open('./model/vectorizer.pk', 'wb') as fout:
             pickle.dump(vectorizer, fout)
 
     if split:
@@ -72,21 +80,23 @@ def buildModel(x,y,valX,valY,name="LR_model.pkl"):
     print("Building Model")
     joblib_file = name
     best_accuracy = 0
-    for c in [6,3,1]:
-        print("C=",c)
-        model = LogisticRegression(penalty="l2",tol=0.001,class_weight='auto' ,C=c, fit_intercept=True, solver="saga", intercept_scaling=1, random_state=42)
+    for c in [25,6,3,1]:
+        print("\n\tC = ", c)
+        model = LogisticRegression(penalty="l1",tol=0.001,class_weight='auto' ,C=c, fit_intercept=True, solver="saga", intercept_scaling=1, random_state=42)
         model.fit(x, y)
         t_acc,t_mcc = scoreModel(model,x,y)
         accuracy,mcc = scoreModel(model,valX,valY)
+
         print("\tTraining Scores: ", t_acc,t_mcc)
         print("\tValidation Scores: ", accuracy,mcc)
-
-        print(f'\tNumber of non-zero model parameters {np.sum(model.coef_!=0)}')
 
         if mcc > best_accuracy:
             save_model(model, joblib_file)
             best_accuracy = accuracy
             print("\tBest acc c= ",c)
+            print(f'\tNumber of non-zero model parameters {np.sum(model.coef_!=0)}')
+            
+    
 
 def scoreModel(model,x,y):
     pred = predict(model,x)
@@ -98,13 +108,14 @@ def finalPredictions(models=None):
     print("Making Final Predictions")
     raw = loadData('test')
     x = preprocessData(raw,split=False)
+    x = np.c_[x,raw['rating']] # add rating column to row
     if models == None:
         model = load_model("LR_model.pkl")
         pred = predict(model,x)
     else:
         def predict_row(row):
-            model = models[row['rating']]
-            pred = predict(model,row)
+            model = models[row[len(row)-1]]
+            pred = predict(model,[row.iloc[:-1]])
             return pred[0]
         df = pd.DataFrame(x)
         pred = df.apply(predict_row,axis=1)
@@ -115,9 +126,16 @@ def finalPredictions(models=None):
     pred_df.to_csv('predictions.csv')
     
 def predict(model,x):
-    yhat = model.predict(x)
+    yhat = model.predict_proba(x)[:,1]
     pred = (yhat >= .5)+0
     return pred
+
+def generate_vectorizer(raw):
+    vectorizer = TfidfVectorizer(max_features=5000)
+    corpora = raw['text_'].astype(str).values.tolist()
+    vectorizer.fit(corpora)
+    with open('./model/vectorizer.pk', 'wb') as fout:
+        pickle.dump(vectorizer, fout)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
