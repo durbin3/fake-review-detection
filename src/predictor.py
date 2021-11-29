@@ -16,11 +16,14 @@ except:
 
 
 def main(argv):
-    train_raw = loadData('train')
-    xTrain,xTest,yTrain,yTest  = preprocessData(train_raw)
-    # val_raw = loadData('validation')
-    # xTest,yTest = preprocessData(val_raw)
-    model = buildModel(xTrain,yTrain,xTest,yTest)
+    if argv[0]=='--train':
+        train_raw = loadData('train')
+        xTrain,xTest,yTrain,yTest  = preprocessData(train_raw)
+        model = buildModel(xTrain,yTrain,xTest,yTest)
+    elif argv[0]=='--test':
+        finalPredictions()
+    else:
+        print("ERROR, unknown argument: ", argv)
     
 def loadData(file):
     print("Loading Datasets")
@@ -32,7 +35,7 @@ def loadData(file):
         raw = pd.read_csv('reviews_test_attributes.csv',quotechar='"',usecols=[0,1,2,3],dtype={'real review?': int,'category': str, 'rating': int, 'text_': str})
     return raw
  
-def preprocessData(raw):
+def preprocessData(raw,split=True):
     print("Preprocessing Data")
     load = False
     try:
@@ -45,24 +48,26 @@ def preprocessData(raw):
     vectorizer.fit(corpora)
     X = vectorizer.transform(corpora)
     X = X.toarray()
-    x_cat = pd.DataFrame(raw['category'])['category'].astype('category').cat.codes
     X = np.insert(X,0,raw['rating'],1)
+    x_cat = pd.DataFrame(raw['category'])['category'].astype('category').cat.codes
     X = np.insert(X,0,x_cat.to_numpy(),1)
     with open('vectorizer.pk', 'wb') as fout:
         if load is False:
             pickle.dump(vectorizer, fout)
 
-    print(X.shape,len(raw['real review?']))
-    x_train,x_test,y_train,y_test = split_train_test(X,raw['real review?'])
-    return x_train,x_test,y_train,y_test
+    if split:
+        x_train,x_test,y_train,y_test = split_train_test(X,raw['real review?'])
+        return x_train,x_test,y_train,y_test
+    else:
+        return X
 
 def buildModel(x,y,valX,valY):
     print("Building Model")
     joblib_file = "LR_model.pkl"
     best_accuracy = 0
-    for c in [100,75,50,25,12,10,6,3,1,.1,.01,.001,.0001]:
+    for c in [25,12,10,6,3,1]:
         print("C=",c)
-        model = LogisticRegression(penalty="l1",tol=0.001, C=c, fit_intercept=True, solver="saga", intercept_scaling=1, random_state=42)
+        model = LogisticRegression(penalty="l2",tol=0.001, C=c, fit_intercept=True, solver="saga", intercept_scaling=1, random_state=42)
         model.fit(x, y)
         t_acc,t_mcc = scoreModel(model,x,y)
         accuracy,mcc = scoreModel(model,valX,valY)
@@ -85,11 +90,12 @@ def scoreModel(model,x,y):
 def finalPredictions():
     print("Making Final Predictions")
     raw = loadData('test')
-    x,_ = preprocessData(raw)
+    x = preprocessData(raw,split=False)
     model = load_model("LR_model.pkl")
     pred = predict(model,x)
-    pred_df = pd.DataFrame(x['ID'])
-    pred_df['real review?'] = pred.values
+    pred_df = pd.DataFrame()
+    pred_df['real review?'] = pred
+    print(pred_df)    
     pred_df.to_csv('predictions.csv')
     
 def predict(model,x):

@@ -22,7 +22,7 @@ def save_model(model,name):
 def load_model(name):
     path = "./model/"+name
     print("Loading Model: ", path)
-    return load(path, 'wb')
+    return load(path)
 
 def create_dir_if_not_exist(dir_name):
     if not os.path.exists(dir_name):
@@ -56,9 +56,9 @@ def split_train_test(x,y):
     train = df.sample(frac=.8,replace=False)
     test = df.drop(train.index)
 
-    x_train = train[:,:-1]
-    y_train = train[:,-1:]
-    x_test = test[:,:-1]
-    y_test = test[:,-1:]
+    x_train = train.iloc[:,:-1]
+    y_train = train.iloc[:,-1:].to_numpy()
+    x_test = test.iloc[:,:-1]
+    y_test = test.iloc[:,-1:].to_numpy()
 
     return x_train,x_test,y_train,y_test
