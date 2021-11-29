@@ -58,7 +58,11 @@ def split_train_test(x,y):
 
     x_train = train.iloc[:,:-1]
     y_train = train.iloc[:,-1:].to_numpy()
+    y_train = y_train.reshape(len(y_train),)
+    
     x_test = test.iloc[:,:-1]
     y_test = test.iloc[:,-1:].to_numpy()
+    y_test = y_test.reshape(len(y_test),)
+
 
     return x_train,x_test,y_train,y_test
