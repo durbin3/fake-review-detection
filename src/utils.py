@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 from joblib import load,dump
-from sklearn.metrics import matthews_corrcoef
+from sklearn.metrics import matthews_corrcoef,roc_auc_score
 
 def normalize_col(col):
     return (col-col.mean())/col.std()
@@ -47,13 +47,17 @@ def calc_if_outlier(df,column):
     return col
 
 def calc_mcc(pred,actual):
-    mcc = matthews_corrcoef(pred,actual)
+    mcc = matthews_corrcoef(actual,pred)
     return mcc
+
+def calc_auc(pred,actual):
+    auc = roc_auc_score(actual,pred)
+    return auc
 
 def split_train_test(x,y):
     df = pd.DataFrame(x)
     df = df.join(y)
-    train = df.sample(frac=.8,replace=False)
+    train = df.sample(frac=.9,replace=False)
     test = df.drop(train.index)
 
     x_train = train.iloc[:,:-1]
